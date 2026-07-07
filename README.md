@@ -25,7 +25,9 @@ Helps users track weight, diet, and exercise through natural language conversati
 - **Language** — Python 3.14
 
 ## Project Structure
-wellness-agent
+
+```
+wellness-agent/
 ├── main.py          # FastAPI server and endpoints
 ├── agent.py         # Claude Agent logic and tools
 ├── database.py      # Database models and setup
@@ -34,13 +36,13 @@ wellness-agent
 ├── .env.example     # Template for environment variables
 ├── requirements.txt # Python dependencies
 └── README.md
+```
 
 ## Getting Started
 
 ### 1. Clone the repo
 
 ```bash
-git clone <your-repo-url>
 cd wellness-agent
 ```
 
