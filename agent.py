@@ -7,7 +7,7 @@ import os
 import json
 from anthropic import Anthropic
 from database import SessionLocal, UserGoal, WeightLog, FoodLog, ExerciseLog
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -120,6 +120,27 @@ tools = [
             "type": "object",
             "properties": {}
         }
+    },
+    {
+        "name": "get_weight_trend",
+        "description": "取得過去幾天的體重記錄，用來顯示趨勢",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "integer",
+                    "description": "要查詢幾天內的記錄，預設7天"
+                }
+            }
+        }
+    },
+    {
+        "name": "get_weekly_report",
+        "description": "取得本週的飲食、運動、體重變化總結報告",
+        "input_schema": {
+            "type": "object",
+            "properties": {}
+        }
     }
 ]
 
@@ -212,6 +233,50 @@ def get_recommendation():
         "progress": progress
     }
 
+def get_weight_trend(days: int = 7):
+    db = SessionLocal()
+    since = datetime.now() - timedelta(days=days)
+    logs = db.query(WeightLog).filter(WeightLog.date >= since).order_by(WeightLog.date.asc()).all()
+    db.close()
+
+    return [
+        {
+            "date": log.date.strftime("%Y-%m-%d"),
+            "weight": log.weight
+        } for log in logs
+    ]
+
+def get_weekly_report():
+    db = SessionLocal()
+    since = datetime.now() - timedelta(days=7)
+
+    weights = db.query(WeightLog).filter(WeightLog.date >= since).order_by(WeightLog.date.asc()).all()
+    foods = db.query(FoodLog).filter(FoodLog.date >= since).all()
+    exercises = db.query(ExerciseLog).filter(ExerciseLog.date >= since).all()
+    db.close()
+
+    weight_change = None
+    if len(weights) >= 2:
+        weight_change = round(weights[-1].weight - weights[0].weight, 1)
+
+    return {
+        "period": f"{since.strftime('%Y-%m-%d')} ~ {datetime.now().strftime('%Y-%m-%d')}",
+        "weight": {
+            "records": [{"date": w.date.strftime("%Y-%m-%d"), "weight": w.weight} for w in weights],
+            "change": weight_change  # 負數代表減重，正數代表增重
+        },
+        "food": {
+            "total_records": len(foods),
+            "total_calories": sum(f.calories for f in foods),
+            "avg_daily_calories": round(sum(f.calories for f in foods) / 7, 1)
+        },
+        "exercise": {
+            "total_records": len(exercises),
+            "total_minutes": sum(e.duration_minutes for e in exercises),
+            "total_calories_burned": sum(e.calories_burned for e in exercises)
+        }
+    }
+
 # --- Tool Execution ---
 # Translates Claude's tool call decisions into actual function calls.
 
@@ -230,6 +295,10 @@ def run_tool(name: str, inputs: dict):
         return check_progress()
     elif name == "get_recommendation":
         return get_recommendation()
+    elif name == "get_weight_trend":
+        return get_weight_trend(**inputs)
+    elif name == "get_weekly_report":
+        return get_weekly_report()
 
 # --- Agent Main Loop ---
 # Sends user message to Claude, executes tools when needed,
