@@ -13,6 +13,7 @@ app = FastAPI()
 # --- Request Model ---
 # Defines the shape of the incoming request body.
 class ChatRequest(BaseModel):
+    user_id: str
     message: str
 
 # --- Startup ---
@@ -28,5 +29,5 @@ def root():
 
 @app.post("/chat")
 def chat(request: ChatRequest):
-    reply = run_agent(request.message)
+    reply = run_agent(request.user_id, request.message)
     return {"reply": reply}

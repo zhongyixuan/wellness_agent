@@ -13,6 +13,9 @@ from dotenv import load_dotenv
 load_dotenv()
 client = Anthropic()
 
+# Stores conversation history per user
+conversation_history = {}
+
 # --- Tool Definitions ---
 # The "menu" that tells Claude what tools are available and what parameters they need.
 
@@ -232,9 +235,13 @@ def run_tool(name: str, inputs: dict):
 # Sends user message to Claude, executes tools when needed,
 # and loops until Claude returns a final response.
 
-def run_agent(user_message: str) -> str:
-    # Create conversation history
-    messages = [{"role": "user", "content": user_message}]
+def run_agent(user_id: str, user_message: str) -> str:
+    # Create new history if first conversation
+    if user_id not in conversation_history:
+        conversation_history[user_id] = []
+
+    messages = conversation_history[user_id]
+    messages.append({"role": "user", "content": user_message})
 
     # This system prompt tells Claude its role and behavior guidelines. It's included with every API call.
     system = """你是一個專業的健康管理助理 WellnessAgent。
@@ -254,6 +261,8 @@ def run_agent(user_message: str) -> str:
 
         # Claude is done, return the final response
         if response.stop_reason == "end_turn":
+            # Save assistant reply to history
+            messages.append({"role": "assistant", "content": response.content[0].text})
             return response.content[0].text
         
         # Claude wants to use a tool
